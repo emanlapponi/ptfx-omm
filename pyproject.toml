@@ -1,0 +1,12 @@
+[project]
+name = "ptfx-omm"
+version = "0.1.0"
+description = "On-my-machine dev/test harness for Polyend Tracker .ptfx Sample Editor plugins"
+requires-python = ">=3.9"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+python_files = ["test_*.py"]
