@@ -159,10 +159,8 @@ def test_stereo_to_mono(app_factory, wav):
     assert r.get("channels") == 1 and r.get("produced") == N
 
 
-def test_mono_upmix(app_factory, tmp_path):
-    # 5) mono input to a STEREO plugin: raw view stays mono, run is upmixed to
-    # stereo. Uses stereo_delay in pure-delay mode (Fdbk=0, Mix=100, Tail=Cut
-    # Off) so the output is exactly the delayed signal with no tail.
+def test_mono_stereo_delay_remains_mono(app_factory, tmp_path):
+    # Mono input is duplicated for processing, but identical output stays mono.
     mono_wav = str(tmp_path / "mono.wav")
     make_sine_wav(mono_wav, 1)
     with wave.open(mono_wav, "rb") as w:
@@ -175,11 +173,43 @@ def test_mono_upmix(app_factory, tmp_path):
     assert meta["input"]["channels"] == 1
 
     r = post(base + "/run", {"values": [40, 0, 100, 1]})  # 40 ms, Fdbk=0, Mix=100, Cut Off
-    assert r.get("channels") == 2
+    assert r.get("channels") == 1
     d = int(40 * RATE / 1000)
     assert r.get("produced") == N  # no tail (Cut Off)
     a = array.array("h")
     a.frombytes(base64.b64decode(r["b64"]))
-    L, R = a[0::2], a[1::2]
-    assert all(v == 0 for v in L[:d]) and all(v == 0 for v in R[:d])
-    assert L[d:d + 5000] == mono[:5000] and R[d:d + 5000] == mono[:5000]
+    assert all(v == 0 for v in a[:d])
+    assert a[d:d + 5000] == mono[:5000]
+
+
+def test_mono_transient_shaper_remains_mono(app_factory, tmp_path):
+    mono_wav = str(tmp_path / "mono.wav")
+    make_sine_wav(mono_wav, 1)
+    app = app_factory("transient_shaper.c", mono_wav)
+    base = f"http://127.0.0.1:{app['port']}"
+
+    for values in ([0, 0], [9, -6]):
+        r = post(base + "/run", {"values": values})
+        assert r.get("channels") == 1
+        assert r.get("produced") == N
+        assert len(base64.b64decode(r["b64"])) == N * 2
+
+
+def test_mono_haas_can_create_stereo(app_factory, tmp_path):
+    mono_wav = str(tmp_path / "mono.wav")
+    make_sine_wav(mono_wav, 1)
+    app = app_factory("haas.c", mono_wav)
+    base = f"http://127.0.0.1:{app['port']}"
+    r = post(base + "/run", {"values": [10, 0]})
+    assert r.get("channels") == 2
+    samples = array.array("h")
+    samples.frombytes(base64.b64decode(r["b64"]))
+    assert samples[0::2] != samples[1::2]
+
+
+def test_existing_stereo_remains_stereo(app_factory, wav):
+    app = app_factory("transient_shaper.c", wav)
+    base = f"http://127.0.0.1:{app['port']}"
+    r = post(base + "/run", {"values": [9, -6]})
+    assert r.get("channels") == 2
+    assert len(base64.b64decode(r["b64"])) == N * 4

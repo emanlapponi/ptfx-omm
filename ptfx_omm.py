@@ -207,6 +207,7 @@ def store_input(rate, channels, raw):
 
 
 def do_run(plugin, binary, values, gen_len):
+    duplicated_mono = False
     if plugin["is_gen"]:
         rate = 44100
         n = 2 if plugin["flags"] & FLAG_STEREO else 1
@@ -223,9 +224,17 @@ def do_run(plugin, binary, values, gen_len):
         # the run only — the stored/raw view keeps the original (mono) layout.
         if (plugin["flags"] & FLAG_STEREO) and len(in_chans) == 1:
             in_chans = upmix(in_chans)
+            duplicated_mono = True
     mono = 1 if plugin["flags"] & FLAG_MONO else 0
     produced, out = run_host(plugin, binary, values, rate, in_chans, out_len, mono)
     nch_out = 1 if mono else len(in_chans)
+    if duplicated_mono and nch_out == 2:
+        pcm = array.array("h")
+        pcm.frombytes(out)
+        left, right = pcm[0::2], pcm[1::2]
+        if left == right:
+            out = left.tobytes()
+            nch_out = 1
     return produced, max_len, rate, nch_out, out
 
 

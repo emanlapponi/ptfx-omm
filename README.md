@@ -24,6 +24,11 @@ This harness reproduces that host on your desktop:
   move one slider/select per plugin parameter, hit Run, and view (or
   download) the resulting waveform.
 
+For mono input, stereo-capable effects receive two identical channels. The
+result remains mono when those channels are identical, and is stereo when
+the effect produces different left and right channels. Stereo input stays
+stereo unless the effect explicitly converts it to mono.
+
 Because the exact same C source runs on the desktop and on the device,
 what you hear in the browser is what the Tracker will produce.
 
